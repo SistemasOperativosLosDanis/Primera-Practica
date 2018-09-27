@@ -49,11 +49,33 @@ copynFile(FILE * origin, FILE * destination, int nBytes)
 char*
 loadstr(FILE * file)
 {
-	char* readFrom;	//String que lees de file
-	size_t contenido = fread(, , ,file);
+	char* readFrom;	//String que lees de file (BUFFER)
+
+	int tam = 0, i;
+
+	i = getc(file);
+	if (i == EOF) return NULL;
+	else tam++;
+
+	//Recorremos el string primero para saber cuanto ocupa
+	//Tiene que revisar que ha llegado al final de la palabra y/o del propio archivo
+	while (i != (int) '\0' && i != EOF){
+		i = getc(file);
+		tam++;
+	}
 	
-	// Complete the function
-	return NULL;
+	//Asignamos al buffer la dirección de inicio y comprobamos si ha habido fallo
+	readFrom = (char*) malloc(tam);
+	if(readFrom == NULL) return NULL;
+
+	//Retrocedemos al principio de la palabra
+	fseek(file, -tam, SEEK_CUR);
+
+	//Escribimos en el buffer
+	fread(readFrom, 1, tam, file);
+	
+	
+	return readFrom;
 }
 
 /** Read tarball header and store it in memory.
@@ -72,6 +94,7 @@ readHeader(FILE * tarFile, int *nFiles)
 	stHeaderEntry* header;
 //... Leemos el número de ficheros (N) del tarFile y lo copiamos en nFiles
 	//Llamada a copynbytes
+	
 
 	/* Reservamos memoria para el array */
 	header = (stHeaderEntry *) malloc(sizeof (stHeaderEntry) * (*nFiles));
