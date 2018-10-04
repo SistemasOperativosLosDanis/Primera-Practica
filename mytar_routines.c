@@ -104,16 +104,19 @@ readHeader(FILE * tarFile, int *nFiles)
 		//... comprobación y tratamiento de errores
 		//... leemos el tamaño del fichero y lo almacenamos en header[i].size
 			
-		//ORDENADOR EXPLICAMELO
+		//Cargamos el nombre del header y se lo asignamos
 		if ((header[i].name=loadstr(tarFile))==NULL) {
+			//*nFiles = valor del puntero
 			for (j = 0; j < *nFiles; j++){
 				free(header[j].name);
-				free(header);
-				fclose(tarFile);
-				return NULL;
-			}
-		}
+			}	
 
+			free(header);
+			fclose(tarFile);
+			return NULL;
+			
+		}
+		//Está en otras partes...del video ;3
 		fread(&header[i].size, sizeof(header[i].size), 1, tarFile);
 	}
 	return header;
@@ -143,8 +146,36 @@ readHeader(FILE * tarFile, int *nFiles)
 int
 createTar(int nFiles, char *fileNames[], char tarName[])
 {
-	// Complete the function
-	return EXIT_FAILURE;
+	int i, j;
+	FILE *tar, *input;	//tarfile al que vamos a añadir el header.
+				//los inputfile se meten con un for.
+
+	stHeaderEntry *header;	//Cabezera estandar.
+	int headerSize;		//Para saber el tamaño de la cabezera.
+	
+	//Si no llegan archivos, da error.
+	if(nFiles <= 0)  return EXIT_FAILURE; 
+	
+	//Intentamos abrir el tarfile
+	//Tarfile tendrá la direccion inicial asignada por fopen
+	//fopen abre el archivo y si no existe lo crea
+	if((tar = fopen(tarName), "wx") == NULL) {
+		return EXIT_FAILURE;
+	}
+
+	//Intentamos alojar todos los headers en memoria. Si no cabe dará fallo
+	//Tamaño de un header multiplicado el número de archivos
+	//En header se guarda la dirección de memeoria en la que se puede empezar a escribir
+	if((header = malloc(sizeof(stHeaderEntry) * nFiles)) == NULL){
+	
+		fclose(tar);
+		remove(tarName);
+		return EXIT_FAILURE;
+	}
+	
+	//Como mínimo tiene el tamaño de un entero
+	headerSize = sizeof(int);
+	
 }
 
 /** Extract files stored in a tarball archive
