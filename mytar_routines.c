@@ -21,7 +21,7 @@ copynFile(FILE * origin, FILE * destination, int nBytes)
 	int c, ret;		//Nº del byte leido (int a char)
 	
 
-	while(nByte < nBytes &&(c = getc(origin)) != EOF)){
+	while(nByte < nBytes && (c = getc(origin)) != EOF)){
 		ret = putc( (unsigned char) c, destination);
 		//Aunque no va a pasar, comprobamos si se queda sin espacio en el destination
 		if(ret == EOF){
@@ -92,9 +92,10 @@ readHeader(FILE * tarFile, int *nFiles)
 {
 	int i,j;
 	stHeaderEntry* header;
-//... Leemos el número de ficheros (N) del tarFile y lo copiamos en nFiles
-	//Llamada a copynbytes
-	
+	//... Leemos el número de ficheros (N) del tarFile y lo copiamos en nFiles
+	//Primer argumento = direccion de memoria donde se empieza a leer
+	//Segundo argumento = sizeof int porque nfiles es un int
+	fread(nFiles, sizeof(int), 1, tarFile);
 
 	/* Reservamos memoria para el array */
 	header = (stHeaderEntry *) malloc(sizeof (stHeaderEntry) * (*nFiles));
@@ -102,6 +103,18 @@ readHeader(FILE * tarFile, int *nFiles)
 	        //.. usamos loadstr para cargar el nombre en header[i].name
 		//... comprobación y tratamiento de errores
 		//... leemos el tamaño del fichero y lo almacenamos en header[i].size
+			
+		//ORDENADOR EXPLICAMELO
+		if ((header[i].name=loadstr(tarFile))==NULL) {
+			for (j = 0; j < *nFiles; j++){
+				free(header[j].name);
+				free(header);
+				fclose(tarFile);
+				return NULL;
+			}
+		}
+
+		fread(&header[i].size, sizeof(header[i].size), 1, tarFile);
 	}
 	return header;
 }
