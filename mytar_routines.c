@@ -94,11 +94,21 @@ readHeader(FILE * tarFile, int *nFiles)
 	stHeaderEntry* header;
 	//... Leemos el número de ficheros (N) del tarFile y lo copiamos en nFiles
 	//Primer argumento = direccion de memoria donde se empieza a leer
-	//Segundo argumento = sizeof int porque nfiles es un int
+	//Segundo argumento = quieres leer sizeof int porque nfiles es un int, y lo leemos 1 vez
+	//Lees sobre tarFile;
 	fread(nFiles, sizeof(int), 1, tarFile);
 
 	/* Reservamos memoria para el array */
+	//El tamaño del header multiplicado por lo que valga el valor de nFiles, de su puntero.
 	header = (stHeaderEntry *) malloc(sizeof (stHeaderEntry) * (*nFiles));
+
+	if(header==NULL){
+		fclose(tarFile);	
+	 	return NULL;  
+	}
+
+	
+
 	for (i = 0; i < *nFiles; i++) {
 	        //.. usamos loadstr para cargar el nombre en header[i].name
 		//... comprobación y tratamiento de errores
@@ -116,9 +126,11 @@ readHeader(FILE * tarFile, int *nFiles)
 			return NULL;
 			
 		}
-		//Está en otras partes...del video ;3
+		//&header.size porque queremos la direccion de memoria
+		//Y queremos leer el size del header[i] una sola vez
 		fread(&header[i].size, sizeof(header[i].size), 1, tarFile);
 	}
+
 	return header;
 }
 
@@ -146,25 +158,24 @@ readHeader(FILE * tarFile, int *nFiles)
 int
 createTar(int nFiles, char *fileNames[], char tarName[])
 {
-	int i, j;
 	FILE *tar, *input;	//tarfile al que vamos a añadir el header.
 				//los inputfile se meten con un for.
 
-	stHeaderEntry *header;	//Cabezera estandar.
+	stHeaderEntry *header;	//Cabezera estandar, con la que reservamos memoria.
 	int headerSize;		//Para saber el tamaño de la cabezera.
 	
 	//Si no llegan archivos, da error.
 	if(nFiles <= 0)  return EXIT_FAILURE; 
 	
 	//Intentamos abrir el tarfile
-	//Tarfile tendrá la direccion inicial asignada por fopen
+	//Tar tendrá la direccion inicial asignada por fopen
 	//fopen abre el archivo y si no existe lo crea
 	if((tar = fopen(tarName), "wx") == NULL) {
 		return EXIT_FAILURE;
 	}
 
 	//Intentamos alojar todos los headers en memoria. Si no cabe dará fallo
-	//Tamaño de un header multiplicado el número de archivos
+	//Tamaño de un header multiplicado el número de estructuras
 	//En header se guarda la dirección de memeoria en la que se puede empezar a escribir
 	if((header = malloc(sizeof(stHeaderEntry) * nFiles)) == NULL){
 	
@@ -173,9 +184,78 @@ createTar(int nFiles, char *fileNames[], char tarName[])
 		return EXIT_FAILURE;
 	}
 	
-	//Como mínimo tiene el tamaño de un entero
-	headerSize = sizeof(int);
+	//Como mínimo, el tamaño del header tiene el tamaño de un entero
+	//Porque nuestro header tiene un array y un int. El array puede ser vacio, pero el int no.
+	//(No va a pasar, pero es una medida de seguridad)
+	HeaderSize = sizeof(int);
 	
+	
+	for(int i = 0; i < nFiles; i++){
+		//Sumamos 1 porque el array tiene "/0" y hay que considerarlo
+		int tamNombre = strlen(fileNames[i]+1); 
+		header[i].name = (char*) malloc(tamNombre); //Se entiende que siempre tendrá nombre
+
+		strcpy(header[i].name, fileNames[i]);
+		
+		//añadimos un elemento que va a ocultar el tamaño del nombre + el size del header
+		//Que será un int, pero así sirve para otros tipos de datos.
+		headerSize += tamNombre + sizeof(header->size);
+		   
+		
+	}
+	
+	//Metemos los datos primero, y luego la cabezera.
+	//SEEK_SET -> offset desde el inicio de los datos
+	fseek(tar, headerSize, SEEK_SET);
+
+	//For para copiar todos los datos y pegarlos en el archivo destino
+	//Necesitaremos también un mecanismo de control para ver si los datos no son null
+	for(int i = 0; i<nFiles; i++){
+		
+		//Abrimos cada uno de los archivos que tenemos en fileNames y los vamos guardando
+		//en el input
+		//Solo lo hacemos de lectura
+		if((input = fopen(fileNames[i], "r")) == NULL){
+			
+			fclose(tar);
+			remove(tarName);
+			
+			//Eliminamos la memoria usada anteriormente si se ha usado
+			for (int j = 0; j < nFiles; j++)
+				free(header[j].name);
+
+			free(header);
+			return (EXIT_FAILURE);		
+		}
+		
+		//Queremos saber cuanto ocupan los datos de nuestro archivo
+		//Luego meteremos el archivo en el tar
+		header[i].size = copynFile(input, tar, INT_MAX);
+		fclose(input);
+	}
+
+	//Volvemos al inicio del archivo
+	rewind(tar);
+	
+	//Escribimos la cabecera del archivo en el tar
+	//Necesitamos la direccion de memoria de nFiles para escribirlo una sola vez con
+	//el tamaño de un int lo que contenga nFiles en tar
+	fwrite(&nFiles, sizeof(int), 1, tar);
+
+	//Vamos a ir añadiendo elementos en el array
+	for (int i = 0; i < nFiles; i++){
+	
+		fwrite(header[i].name, 1, strlen(header[i].name + 1, tar);
+		fwrite(&header[i].size, sizeof(header[i].size), 1, tar);
+	}
+
+	//Debemos liberar la memoria que ya no vamos a utilizar
+	for (int i = 0; i < nFiles; i++)
+		free(header[i].name;
+	free(header);
+	fclose(tar);
+
+	return (EXIT_SUCCESS);
 }
 
 /** Extract files stored in a tarball archive
@@ -195,6 +275,57 @@ createTar(int nFiles, char *fileNames[], char tarName[])
 int
 extractTar(char tarName[])
 {
+	StHeaderEntry * header = NULL;
+	int numArchivos;		//Para los archivos
+	FILE * tar = NULL;			//Tarfile
+
+	//Intentamos abrir el tarfile
+	//Tar tendrá la direccion inicial asignada por fopen
+	//fopen abre el archivo y si no existe lo crea
+	if((tar = fopen(tarName), "r") == NULL) {
+		return EXIT_FAILURE;
+	}
+
+	//Lectura de la cabecera
+	header = readHeader(tar, &numArchivos);
+			
+	for(int i= 0; i < numArchivos; i++){
+	
+		//Creamos y escribimos sobre los ficheros
+		FILE * tmpFile = fopen(header[i].name, "w");
+		//Caso de error
+		if(tmpFile == NULL){
+			for(int j = 0; j < numArchivos; j++)
+				free(header[i].name);
+			free(header);
+			fclose(tar);
+			return (EXIT_FAILURE);
+		}
+		//Caso de acierto
+		//Con esto sabemos cuantos datos se han copiado
+		int copiaFiles = copynFile(tar, tmpFile, header[i].size);
+
+		if(copiaFiles = -1){
+			for(int j = 0; j < numArchivos; j++)
+				free(header[i].name);
+			free(header);
+			fclose(tar);
+			return (EXIT_FAILURE);
+		}
+
+		fclose(tmpFile);	//Si se copia bien, lo cerramos.
+		
+		
+	}
+
+	//Vamos a liberar la cabecera y cerrar todo
+	for(int i = 0; i < numArchivos, i++) 
+		free(header[i].name);
+	free(header)
+	close(tar);
+	
+	return EXIT_SUCCESS;
+	
 	// Complete the function
 	return EXIT_FAILURE;
 }
